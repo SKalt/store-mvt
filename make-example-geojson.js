@@ -1,5 +1,5 @@
 const {randomPoint} = require('@turf/random');
 const fs = require('fs');
 
-let aMillionPoints = randomPoint(1000000);
-fs.writeFileSync('aMillionPoints.geojson', JSON.stringify(aMillionPoints));
+let aThousandPoints = randomPoint(1000);
+fs.writeFileSync('aThousandPoints.geojson', JSON.stringify(aThousandPoints));
