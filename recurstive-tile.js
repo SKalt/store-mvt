@@ -1,39 +1,74 @@
 const geojsonVt = require('@mapbox/geojson-vt');
 const vtPbf = require('@mapbox/vt-pbf');
 const {getChildren} = require('@mapbox/tilebelt');
-// const cover = require('@mapbox/tile-cover');
 const {exists, mkdir} = require('fs');
 const {join} = require('path');
 const debug = require('debug');
 
-// layername:geojson || layerName:index -> register indexes
-// for each zoom min->max,
-//   if any features in any tile @ this z/x/y, recurse on children.
 /**
- * [ensureIndexes description]
- * @param  {[type]} layerIndexMapping [description]
- * @param  {[type]} options           [description]
- * @return {[type]}                   [description]
+ * A datastructure indexing geospatial objects that outputs tiles via a
+ * getTile method.  @see {@link https://github.com/mapbox/geojson-vt#usage}
+ * @interface TileIndex
  */
-function ensureIndexes(layerIndexMapping, options) {
+
+/**
+ * Gets a tile at coordinates z, x, y
+ * @name getTile
+ * @memberof TileIndex
+ * @method
+ * @param  {Nubmer} z  the z-index of the tile
+ * @param  {Number} x  the x-index of the tile
+ * @param  {Number} y  the y-index of the tile
+ * @return {Tile} a geojson-vt-compatible JSON tile object
+ */
+
+/**
+ * A mapping of layer names to [TileIndexes]{@link TileIndex}.
+ * @typedef LayerIndexMapping
+ * @property {TileIndex} *layerName a tile index that represents a layer in the
+ * resulting tileset
+ */
+
+/**
+ * A mapping of layer names to @see Tiles at a given z, x, y.
+ * @typedef LayerTileMapping
+ * @property {Tile}
+ */
+
+/**
+ * @typedef MVT a profobuf-encoded @see Tile
+ */
+
+/**
+ * Ensures any geojson layers input are turned into
+ * [TileIndexes]{@link TileIndex}
+ * @param  {Object} layerIndexMapping where layers may be either geojson or
+ *  [TileIndexes]{@link TileIndex}
+ * @param  {Object} [options={}] Options for geojson-vt to parse a geojson
+ *   dataset. @see https://github.com/mapbox/geojson-vt#options
+ * @return {LayerIndexMapping}
+ */
+function ensureIndexes(layerIndexMapping, options={}) {
   return Object.entries(layerIndexMapping)
-    .map(([layerName, data]) => {
-      if (data.getTile && data.getTile.constructor == Function) {
-        return data; // since it's an index
-      } else {
-        if ((index.features || index.geometry) && 'type' in index ) {
-          return geojsonVt(data, options);
+    .map(
+      ([layerName, data]) => {
+        if (data.getTile && data.getTile.constructor == Function) {
+          return {[layerName]: data}; // since it's an index
         } else {
-          throw new Error('unexpected input:', {[layerName]: index});
+          if ((index.features || index.geometry) && 'type' in index ) {
+            return {[layerName]: geojsonVt(data, options)};
+          } else {
+            throw new Error('unexpected input:', {[layerName]: index});
+          }
         }
-      }
-    });
+      })
+    .reduce((a, b) => Object.assign(a, b), {});
 }
 
 /**
- * [anyFeatures description]
- * @param  {[type]} layerTileMapping [description]
- * @return {[type]}                  [description]
+ * Checks whether any tiles contain features
+ * @param  {LayerTileMapping} layerTileMapping
+ * @return {Boolean} Whether any tiles contain features
  */
 function anyFeatures(layerTileMapping) {
   return Object.values(layerTileMapping)
@@ -46,7 +81,7 @@ function anyFeatures(layerTileMapping) {
  * @param  {Nubmer} z  the z-index of the tile
  * @param  {Number} x  the x-index of the tile
  * @param  {Number} y  the y-index of the tile
- * @return {Object} {[layerName]: geojson-vt-style tile}
+ * @return {LayerTileMapping}
  */
 function getTiles(layerIndexMapping, z, x, y) {
   return Object.entries(layerIndexMapping)
@@ -60,8 +95,8 @@ function getTiles(layerIndexMapping, z, x, y) {
 
 /**
  * Returns the non-empty pbf tile at coordinates z, x, y
- * @param  {Object} layerIndexMapping An object mapping layer names to tile
- *  indexes
+ * @param  {LayerIndexMapping} layerIndexMapping An object mapping layer names
+ *   to tile indexes
  * @param  {Nubmer} z  the z-index of the tile
  * @param  {Number} x  the x-index of the tile
  * @param  {Number} y  the y-index of the tile
@@ -76,9 +111,9 @@ function getBuff(layerIndexMapping, z, x, y) {
 }
 
 /**
- * Saves a file to a target
- * @private
- * @param  {protobuf} buff   [description]
+ * Saves a @see MVT to a target destination.
+ * @private @ignore
+ * @param  {MVT} buff
  * @param  {String} target a string in the style of a slippy map tile (e.g
  * 'z/x/y.pbf')
  */
@@ -93,14 +128,16 @@ function save(buff, target) {
 
 /**
  * saves a protobuf in slippy tile format
- * @param  {protobuf} buff a protobuf-encoded .mvt tile
+ * @param  {MVT} buff a protobuf-encoded .mvt tile
  * @param  {Nubmer} z  the z-index of the tile
  * @param  {Number} x  the x-index of the tile
  * @param  {Number} y  the y-index of the tile
- * @param  {String} [ext='pbf'] the file extension to use on each tile
+ * @param  {Object} options ...
+ * @param {String} [options.path='.'] the path to the z/x/y tile directory
+ * @param {String} [options.ext='pbf'] the file extension to use on each tile
  */
-function saveBuff(buff, z, x, y, ext='pbf') {
-  dir = join(z, x);
+function saveBuff(buff, z, x, y, options) {
+  dir = join(options.path || '', z, x);
   if (exists(dir)) {
     save(buff, join(dir, `${y}.${ext}`));
   } else {
@@ -114,10 +151,13 @@ function saveBuff(buff, z, x, y, ext='pbf') {
 /**
  * Recursively saves the tiles in the indexMapping at and below the input z, x,
  *  y
- * @param  {Object} indexMapping an indexMapping
- * @param  {Object} options      [description]
+ * @param  {LayerIndexMapping} indexMapping
+ * @param  {Object} options @see ensureIndexes#options , with the following
+ *   special properties:
  * @param  {String|undefined} [options.ext='pbf'] the file extension with which
- * to save each tile
+ *   to save each tile
+ * @param {String|undefined} [options.path='.'] where to store the z/x/y tile
+ *   directory
  * @param  {Number} options.maxZoom the maximum zoom to save
  * @param  {Number} [z=0]  the z-coordinate of the tile
  * @param  {Number} [x=0]  the x-coordinate of the tile
@@ -126,8 +166,8 @@ function saveBuff(buff, z, x, y, ext='pbf') {
 function recurse(indexMapping, options, z=0, x=0, y=0) {
   const buff = getBuff(indexMapping, z, x, y);
   if (buff) {
-    saveBuff(buff, z, x, y, options.ext || 'pbf');
-    if (z < (options.maxZoom || options.max_zoom) && z < 24) {
+    saveBuff(buff, z, x, y, options);
+    if (z < (options.maxZoom || options.max_zoom || 24) && z < 24) {
       getChildren(z, x, y).forEach(
         (child) => {
           recurse(index, ...child);
@@ -140,9 +180,8 @@ function recurse(indexMapping, options, z=0, x=0, y=0) {
 /**
  * Turns a mapping of layer names to layer tile indexes into a directory
  * of /x/y/z/tile.mvt
- * @param  {Object} layerIndexMapping {[layerName]: tileIndex}
- * @param  {Object} options the options object supplied to supercluster or
- * geojson-vt
+ * @param  {LayerIndexMapping} layerIndexMapping {[layerName]: tileIndex}
+ * @param  {Object} options @see ensureIndexes#options
  */
 function init(layerIndexMapping, options) {
   layerIndexMapping = ensureIndexes(layerIndexMapping, options);
