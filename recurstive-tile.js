@@ -173,10 +173,26 @@ function recurse(indexMapping, options, z=0, x=0, y=0) {
           recurse(index, ...child);
         }
       );
+      const tileId = toId(z, x, y);
+      Object.values(indexMapping).forEach(
+        (tileIndex) =>{
+          if (tileIndex.tiles) delete tileIndex.tiles[tileId];
+        }
+      );
     }
   }
 }
-
+/**
+ * Generates the id of a tile in a tileIndex. Copied from
+ * https://github.com/mapbox/geojson-vt/blob/master/src/index.js#L195
+ * @param  {Nubmer} z  the z-index of the tile
+ * @param  {Number} x  the x-index of the tile
+ * @param  {Number} y  the y-index of the tile
+ * @return {[type]}   [description]
+ */
+function toId(z, x, y) {
+  return (((1 << z) * y + x) * 32) + z;
+}
 /**
  * Turns a mapping of layer names to layer tile indexes into a directory
  * of /x/y/z/tile.mvt
