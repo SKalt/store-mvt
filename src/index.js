@@ -157,15 +157,15 @@ const ensureDir = (dir) => {
  * saves a protobuf in slippy tile format
  * @async
  * @param  {MVT} buff a protobuf-encoded .mvt tile
- * @param  {Nubmer} z  the z-index of the tile
- * @param  {Number} x  the x-index of the tile
- * @param  {Number} y  the y-index of the tile
  * @param  {Object} options ...
  * @param {String} [options.target='.'] the path to the z/x/y tile directory
  * @param {String} [options.ext='pbf'] the file extension to use on each tile
+ * @param  {Nubmer} z  the z-index of the tile
+ * @param  {Number} x  the x-index of the tile
+ * @param  {Number} y  the y-index of the tile
  * @return {Promise} resolves true when done.
  */
-function saveBuff(buff, z, x, y, options) {
+function saveBuff(buff, options, z, x, y ) {
   return ensureDir(options.target)
     .then((dir)=>ensureDir(join(dir, `${z}`)))
     .then((dir)=>ensureDir(join(dir, `${x}`)))
@@ -183,6 +183,8 @@ function saveBuff(buff, z, x, y, options) {
  *   to save each tile
  * @param {String|undefined} [options.target='.'] where to store the z/x/y tile
  *   directory
+ * @param {Function} [options.save=saveBuff] an optional callback to save each
+ *   tile
  * @param  {Number} options.maxZoom the maximum zoom to save
  * @param  {Number} [z=0]  the z-coordinate of the tile
  * @param  {Number} [x=0]  the x-coordinate of the tile
@@ -193,9 +195,10 @@ async function recur(indexMapping, options, z=0, x=0, y=0) {
   debug('this:recursion')(
     `processing ${z}/${x}/${y} for ${Object.keys(indexMapping).join()}`
   );
+  const save = options.save || saveBuff;
   const buff = getBuff(indexMapping, z, x, y);
   if (buff) {
-    await saveBuff(buff, z, x, y, options);
+    await save(buff, options, z, x, y);
     if (z < (options.maxZoom || options.max_zoom || 24) && z < 24) {
       await Promise.all(
         getChildren([x, y, z]).map(

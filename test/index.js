@@ -102,16 +102,16 @@ suite('Integration tests', ()=>{
   };
   test('Saves geojson multipolygons', ()=>{
     const target = join(__dirname, 'output', 'usa');
-    return main.init({_usa}, {target})
+    return main.storeMvt({_usa}, {target})
       .then(()=>checkDirectory(target));
   });
   test('Saves supercluster', ()=>{
     const target = join(__dirname, 'output', 'cluster');
-    return main.init({_points}, {target}).then(()=>checkDirectory(target));
+    return main.storeMvt({_points}, {target}).then(()=>checkDirectory(target));
   });
   test('can save both', ()=>{
     const target = join(__dirname, 'output', 'ensemble');
-    return main.init({_points, _usa}, {target})
+    return main.storeMvt({_points, _usa}, {target})
       .then(()=>checkDirectory(target));
   });
 });
