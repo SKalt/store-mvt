@@ -24,7 +24,7 @@
 <dt><a href="#getBuff">getBuff(layerIndexMapping, z, x, y)</a> ⇒ <code>protobuf</code> | <code>undefined</code></dt>
 <dd><p>Returns the non-empty pbf tile at coordinates z, x, y</p>
 </dd>
-<dt><a href="#saveBuff">saveBuff(buff, z, x, y, options)</a> ⇒ <code>Promise</code></dt>
+<dt><a href="#saveBuff">saveBuff(buff, options, z, x, y)</a> ⇒ <code>Promise</code></dt>
 <dd><p>saves a protobuf in slippy tile format</p>
 </dd>
 <dt><a href="#storeMvt">storeMvt(layerIndexMapping, options)</a> ⇒ <code>Promise</code></dt>
@@ -83,6 +83,7 @@ Recursively saves the tiles in the indexMapping at and below the input z, x,
 | options | <code>Object</code> |  | @see ensureIndexes#options , with the following   special properties: |
 | [options.ext] | <code>String</code> \| <code>undefined</code> | <code>&#x27;pbf&#x27;</code> | the file extension with which   to save each tile |
 | [options.target] | <code>String</code> \| <code>undefined</code> | <code>&#x27;.&#x27;</code> | where to store the z/x/y tile   directory |
+| [options.save] | <code>function</code> | <code>saveBuff</code> | an optional callback to save each   tile |
 | options.maxZoom | <code>Number</code> |  | the maximum zoom to save |
 | [z] | <code>Number</code> | <code>0</code> | the z-coordinate of the tile |
 | [x] | <code>Number</code> | <code>0</code> | the x-coordinate of the tile |
@@ -148,7 +149,7 @@ if the tile(s) at these coordinates are empty
 
 <a name="saveBuff"></a>
 
-## saveBuff(buff, z, x, y, options) ⇒ <code>Promise</code>
+## saveBuff(buff, options, z, x, y) ⇒ <code>Promise</code>
 saves a protobuf in slippy tile format
 
 **Kind**: global function  
@@ -158,12 +159,12 @@ saves a protobuf in slippy tile format
 | Param | Type | Default | Description |
 | --- | --- | --- | --- |
 | buff | [<code>MVT</code>](#MVT) |  | a protobuf-encoded .mvt tile |
-| z | <code>Nubmer</code> |  | the z-index of the tile |
-| x | <code>Number</code> |  | the x-index of the tile |
-| y | <code>Number</code> |  | the y-index of the tile |
 | options | <code>Object</code> |  | ... |
 | [options.target] | <code>String</code> | <code>&#x27;.&#x27;</code> | the path to the z/x/y tile directory |
 | [options.ext] | <code>String</code> | <code>&#x27;pbf&#x27;</code> | the file extension to use on each tile |
+| z | <code>Nubmer</code> |  | the z-index of the tile |
+| x | <code>Number</code> |  | the x-index of the tile |
+| y | <code>Number</code> |  | the y-index of the tile |
 
 <a name="storeMvt"></a>
 
