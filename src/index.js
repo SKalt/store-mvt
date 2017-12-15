@@ -1,5 +1,5 @@
-const geojsonVt = require('@mapbox/geojson-vt');
-const vtPbf = require('@mapbox/vt-pbf');
+const geojsonVt = require('geojson-vt');
+const vtPbf = require('vt-pbf');
 const {getChildren} = require('@mapbox/tilebelt');
 const {exists, mkdir} = require('fs');
 const {join} = require('path');
@@ -55,10 +55,10 @@ function ensureIndexes(layerIndexMapping, options={}) {
         if (data.getTile && data.getTile.constructor == Function) {
           return {[layerName]: data}; // since it's an index
         } else {
-          if ((index.features || index.geometry) && 'type' in index ) {
+          if ((data.features || data.geometry) && 'type' in data ) {
             return {[layerName]: geojsonVt(data, options)};
           } else {
-            throw new Error('unexpected input:', {[layerName]: index});
+            throw new Error('unexpected input:', {[layerName]: data});
           }
         }
       })
@@ -71,8 +71,12 @@ function ensureIndexes(layerIndexMapping, options={}) {
  * @return {Boolean} Whether any tiles contain features
  */
 function anyFeatures(layerTileMapping) {
-  return Object.values(layerTileMapping)
-    .some((tile) => tile.features.length > 0);
+  // Object.entries(layerTileMapping).forEach((e) => console.log(e));
+  return Object.entries(layerTileMapping)
+    .some(([layerName, tile]) => {
+      // console.log(layerName, JSON.stringify(tile));
+      return ((tile || {}).features || []).length > 0;
+    });
 }
 
 /**
@@ -86,11 +90,11 @@ function anyFeatures(layerTileMapping) {
 function getTiles(layerIndexMapping, z, x, y) {
   return Object.entries(layerIndexMapping)
     .map(
-      ([layerName, index]) =>{
+      ([layerName, index]) => {
         return {[layerName]: index.getTile(z, x, y)};
       }
     )
-    .reduce(Object.assign, {});
+    .reduce((a, r)=>Object.assign(a, r), {});
 }
 
 /**
