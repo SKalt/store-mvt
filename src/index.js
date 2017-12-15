@@ -126,6 +126,12 @@ function save(buff, target) {
   }).catch((err) => debug('this:save')(err));
 }
 
+/**
+ * Ensures a directory exists.
+ * @private @ignore
+ * @param  {String} dir a path to a directory
+ * @return {Promise} resolves the directory path when the directory exists.
+ */
 const ensureDir = (dir) => {
   return new Promise((resolve, reject) => {
     if (exists(dir)) {
@@ -144,6 +150,7 @@ const ensureDir = (dir) => {
     }
   }).catch((err) => debug('this:ensureDir')(err));
 };
+
 /**
  * saves a protobuf in slippy tile format
  * @param  {MVT} buff a protobuf-encoded .mvt tile
@@ -156,7 +163,6 @@ const ensureDir = (dir) => {
  * @return {Promise} resolves true when done.
  */
 function saveBuff(buff, z, x, y, options) {
-  // let dir = join(options.target || '', `${z}`, `${x}`);
   return ensureDir(options.target)
     .then((dir)=>ensureDir(join(dir, `${z}`)))
     .then((dir)=>ensureDir(join(dir, `${x}`)))
@@ -212,6 +218,7 @@ async function recur(indexMapping, options, z=0, x=0, y=0) {
   }
   return true;
 }
+
 /**
  * Generates the id of a tile in a tileIndex. Copied from
  * https://github.com/mapbox/geojson-vt/blob/master/src/index.js#L195
@@ -223,6 +230,7 @@ async function recur(indexMapping, options, z=0, x=0, y=0) {
 function toId(z, x, y) {
   return (((1 << z) * y + x) * 32) + z;
 }
+
 /**
  * Turns a mapping of layer names to layer tile indexes into a directory
  * of /x/y/z/tile.mvt
@@ -265,5 +273,6 @@ function init(layerIndexMapping, options) {
   });
 }
 // TODO: rename init to something descriptive
+
 // export everything important for testing
 module.exports = {init, getTiles, getBuff, saveBuff, ensureIndexes, recur};
