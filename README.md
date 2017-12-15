@@ -1,4 +1,6 @@
 # store-mvt
+
+![Travis-ci build status](https://travis-ci.org/SKalt/store-mvt.svg?branch=master)
 > A module to slice and store [mapbox vector tiles (.mvt)](https://www.mapbox.com/vector-tiles/specification) from within Node.js.
 
 ## Installation
