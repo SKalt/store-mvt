@@ -67,20 +67,6 @@ function ensureIndexes(layerIndexMapping, options={}) {
     .reduce((a, b) => Object.assign(a, b), {});
 }
 
-// /**
-//  * Checks whether any tiles contain features
-//  * @param  {LayerTileMapping} layerTileMapping
-//  * @return {Boolean} Whether any tiles contain features
-//  */
-// function anyFeatures(layerTileMapping) {
-//   // Object.entries(layerTileMapping).forEach((e) => console.log(e));
-//   return Object.entries(layerTileMapping)
-//     .some(([layerName, tile]) => {
-//       // console.log(layerName, JSON.stringify(tile));
-//       return ((tile || {}).features || []).length > 0;
-//     });
-// }
-
 /**
  * Gets a tile at given coordinates from each input tileIndex
  * @param  {Object} layerIndexMapping {[layerName]: tileIndex}
@@ -191,6 +177,7 @@ function saveBuff(buff, z, x, y, options) {
  * @param  {Number} [z=0]  the z-coordinate of the tile
  * @param  {Number} [x=0]  the x-coordinate of the tile
  * @param  {Number} [y=0]  the x-coordinate of the tile
+ * @return {Promise} when all the child tiles are saved.
  */
 async function recur(indexMapping, options, z=0, x=0, y=0) {
   debug('this:recursion')(
@@ -219,7 +206,9 @@ async function recur(indexMapping, options, z=0, x=0, y=0) {
       debug('this:recur')(`reached max zoom @ ${z}`);
     }
   } else {
-    debug('this:recur')(`no pbf for layers ${Object.keys(indexMapping)} @ ${z}/${x}/${y}`);
+    debug('this:recur')(
+      `no pbf for layers ${Object.keys(indexMapping)} @ ${z}/${x}/${y}`
+    );
   }
   return true;
 }
