@@ -163,14 +163,14 @@ function saveBuff(buff, z, x, y, options) {
  * @param  {Number} [x=0]  the x-coordinate of the tile
  * @param  {Number} [y=0]  the x-coordinate of the tile
  */
-function recurse(indexMapping, options, z=0, x=0, y=0) {
+function recur(indexMapping, options, z=0, x=0, y=0) {
   const buff = getBuff(indexMapping, z, x, y);
   if (buff) {
     saveBuff(buff, z, x, y, options);
     if (z < (options.maxZoom || options.max_zoom || 24) && z < 24) {
       getChildren(z, x, y).forEach(
         (child) => {
-          recurse(index, ...child);
+          recur(index, ...child);
         }
       );
       const tileId = toId(z, x, y);
@@ -213,4 +213,4 @@ function init(layerIndexMapping, options) {
 }
 // TODO: rename init to something descriptive
 // export everything important for testing
-module.exports = {init, getTiles, getBuff, saveBuff, ensureIndexes, recurse};
+module.exports = {init, getTiles, getBuff, saveBuff, ensureIndexes, recur};
