@@ -33,6 +33,7 @@
     "@turf/random": "^5.1.0",
     "debug": "^3.1.0",
     "geojson-vt": "^3.0.0",
+    "handlebars": "^4.0.0",
     "supercluster": "^3.0.1",
     "vt-pbf": "^3.1.0"
   },
@@ -46,6 +47,7 @@
     "eslint-config-google": "^0.9.1",
     "jsdoc": "^3.5.5",
     "jsdoc-babel": "^0.3.0",
-    "jsdoc-to-markdown": "^3.0.2"
+    "jsdoc-to-markdown": "^3.0.2",
+    "mocha": "^4.0.1"
   }
 }
