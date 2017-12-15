@@ -4,9 +4,9 @@
   "description": "An experiment in makeing a set of mbtiles from the output of geojson-vt",
   "main": "index.js",
   "scripts": {
-    "test": "mocha -u tdd test/initial.test.js",
+    "test": "mocha -u tdd test/index.js",
     "posttest": "rm -r test/output/*",
-    "debug-test": "DEBUG=this:* mocha -u tdd test/initial.test.js"
+    "debug-test": "DEBUG=this:* mocha -u tdd test/index.js"
   },
   "keywords": [
     "geojson",
