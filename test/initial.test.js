@@ -7,10 +7,12 @@ const {join} = require('path');
 // const coverageOf = require('@mapbox/tile-cover');
 const Pbf = require('pbf');
 const {VectorTile} = require('@mapbox/vector-tile');
-const {points/* , usa*/} = require('./fixtures/load-geojson.js');
+const {points, usa} = require('./fixtures/load-geojson.js');
 const turf = {...require('@turf/random'), ...require('@turf/helpers')};
 const main = require('../src/index.js');
 const {getTiles, getBuff, ensureIndexes} = main;
+const debug = require('debug');
+if (process.env.DEBUG) debug.enable(process.env.DEBUG);
 
 suite('Internals', ()=>{
   suite('getTiles', ()=>{
@@ -64,43 +66,54 @@ suite('Internals', ()=>{
       );
     });
   });
-  // suite('recurse', ()=>{
-  //   test('recurs correctly', ()=>{
-  //       // sinon.stub()
-  //   });
-  //   test('deletes completed tiles correctly', ()=>{
-  //     //
-  //   });
-  // });
 });
 
 suite('Integration tests', ()=>{
-  let usa;
-  let points;
-  // make assertions about the resulting filestructure here
-  // /**
-  //  * Asserts all of the coordinates input represent tiles.
-  //  * @param  {String} target the target directory in ../output to search
-  //  * @param  {String} [ext='pbf'] the file extension to expect on each tile.
-  //  * @param  {Object.<Number,Number,Number>[]|Array[Number[]]} coordinates An
-  //  array of {z, x, y} or [z, x, y] coordinates
-  //  */
-  // const fileFormatIsCorrect = (target, ext, ...coordinates) =>{
-  //   const tilePath = (coordinates) => join(__dirname, 'output', target);
-  //
-  // }
+  let _usa;
+  let _points;
   setup(function() {
-    usa = geojsonVt(usa, {
-      maxZoom: 14
+    _usa = geojsonVt(usa, {
+      maxZoom: 4 // for timing
     });
-    points = supercluster(points, {});
+    _points = supercluster();
+    _points.load(points.features);
   });
+  const checkDirectory = (path) => {
+    assert(fs.existsSync(path), path + ' is missing');
+    let firstLevel = fs.readdirSync(path);
+    const checkNumericSubdirectories = (level, index) => {
+      let n = index == 'z' ? 2 : 1;
+      assert(
+        level.length >= n,
+        'insufficient subdirectories created @ level ' + index
+      );
+      assert(
+        level.every((subdir) => subdir.match(/^\d+$/)),
+        'non-numeric first-level directories detected @ level ' + index
+      );
+    };
+    checkNumericSubdirectories(firstLevel, 'z');
+    let secondLevel = fs.readdirSync(join(path, firstLevel[0]));
+    checkNumericSubdirectories(secondLevel, 'x');
+    let thirdLevel = fs.readdirSync(join(path, firstLevel[0], secondLevel[0]));
+    assert(thirdLevel.length, 'no subdirectories created @ level y');
+    assert(
+      thirdLevel.every((tile) => tile.match(/^\d+\.(pbf|mvt)$/)),
+      'a bad tile format was detected among ' + JSON.stringify(thirdLevel)
+    );
+  };
   test('Saves geojson multipolygons', ()=>{
-    init({usa}, {target: 'output/usa'});
-    assert(fs.existsSyc(join('output', 'usa')));
+    const target = join(__dirname, 'output', 'usa');
+    return main.init({_usa}, {target})
+      .then(()=>checkDirectory(target));
   });
   test('Saves supercluster', ()=>{
-    init({points}, {target: join('output', 'cluster')});
-    assert(fs.existsSync(join('output', 'cluster')));
+    const target = join(__dirname, 'output', 'cluster');
+    return main.init({_points}, {target}).then(()=>checkDirectory(target));
+  });
+  test('can save both', ()=>{
+    const target = join(__dirname, 'output', 'ensemble');
+    return main.init({_points, _usa}, {target})
+      .then(()=>checkDirectory(target));
   });
 });

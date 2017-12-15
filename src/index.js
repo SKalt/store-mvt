@@ -1,8 +1,9 @@
 const geojsonVt = require('geojson-vt');
 const vtPbf = require('vt-pbf');
-const {getChildren} = require('@mapbox/tilebelt');
-const {exists, mkdir} = require('fs');
+const {getChildren, bboxToTile} = require('@mapbox/tilebelt');
+const {existsSync: exists, mkdir, writeFile} = require('fs');
 const {join} = require('path');
+const bbox = require('@turf/bbox');
 const debug = require('debug');
 
 /**
@@ -52,6 +53,7 @@ function ensureIndexes(layerIndexMapping, options={}) {
   return Object.entries(layerIndexMapping)
     .map(
       ([layerName, data]) => {
+        data = data || {};
         if (data.getTile && data.getTile.constructor == Function) {
           return {[layerName]: data}; // since it's an index
         } else {
@@ -65,19 +67,19 @@ function ensureIndexes(layerIndexMapping, options={}) {
     .reduce((a, b) => Object.assign(a, b), {});
 }
 
-/**
- * Checks whether any tiles contain features
- * @param  {LayerTileMapping} layerTileMapping
- * @return {Boolean} Whether any tiles contain features
- */
-function anyFeatures(layerTileMapping) {
-  // Object.entries(layerTileMapping).forEach((e) => console.log(e));
-  return Object.entries(layerTileMapping)
-    .some(([layerName, tile]) => {
-      // console.log(layerName, JSON.stringify(tile));
-      return ((tile || {}).features || []).length > 0;
-    });
-}
+// /**
+//  * Checks whether any tiles contain features
+//  * @param  {LayerTileMapping} layerTileMapping
+//  * @return {Boolean} Whether any tiles contain features
+//  */
+// function anyFeatures(layerTileMapping) {
+//   // Object.entries(layerTileMapping).forEach((e) => console.log(e));
+//   return Object.entries(layerTileMapping)
+//     .some(([layerName, tile]) => {
+//       // console.log(layerName, JSON.stringify(tile));
+//       return ((tile || {}).features || []).length > 0;
+//     });
+// }
 
 /**
  * Gets a tile at given coordinates from each input tileIndex
@@ -91,7 +93,10 @@ function getTiles(layerIndexMapping, z, x, y) {
   return Object.entries(layerIndexMapping)
     .map(
       ([layerName, index]) => {
-        return {[layerName]: index.getTile(z, x, y)};
+        let tile = index.getTile(z, x, y);
+        const isPopulated = tile && tile.features.length;
+        debug('getTiles:isPopulated')(`${isPopulated}:${z}${x}${y}`);
+        return isPopulated ? {[layerName]: tile} : {};
       }
     )
     .reduce((a, r)=>Object.assign(a, r), {});
@@ -109,8 +114,10 @@ function getTiles(layerIndexMapping, z, x, y) {
  */
 function getBuff(layerIndexMapping, z, x, y) {
   const tileObj = getTiles(layerIndexMapping, z, x, y);
-  if (anyFeatures(tileObj)) {
+  if (Object.keys(tileObj).length) {
     return vtPbf.fromGeojsonVt(tileObj);
+  } else {
+    debug('getBuff')(tileObj);
   }
 }
 
@@ -120,16 +127,37 @@ function getBuff(layerIndexMapping, z, x, y) {
  * @param  {MVT} buff
  * @param  {String} target a string in the style of a slippy map tile (e.g
  * 'z/x/y.pbf')
+ * @return {Promise} resolves true when done.
  */
 function save(buff, target) {
-  fs.writeFile(
-    target, buff, (err, success) =>{
-      if (err) throw err;
-      debug('save')(`${target} : success`);
-    }
-  );
+  return new Promise((resolve, reject) =>{
+    writeFile(
+      target, buff, (err, success) =>{
+        if (err) reject(err);
+        debug('this:save')(`${target} : success`);
+        resolve(true);
+      });
+  }).catch((err) => debug('this:save')(err));
 }
 
+const ensureDir = (dir) => {
+  return new Promise((resolve, reject) => {
+    if (exists(dir)) {
+      resolve(dir);
+    } else {
+      mkdir(dir, (err)=>{
+        if (err) {
+          debug('this:dir:err')(err);
+          if (!err.message.match('EEXIST')) {
+            debug('this:dir:unknown')(err);
+            reject(err);
+          }
+        }
+        resolve(dir);
+      });
+    }
+  }).catch((err) => debug('this:ensureDir')(err));
+};
 /**
  * saves a protobuf in slippy tile format
  * @param  {MVT} buff a protobuf-encoded .mvt tile
@@ -137,19 +165,16 @@ function save(buff, target) {
  * @param  {Number} x  the x-index of the tile
  * @param  {Number} y  the y-index of the tile
  * @param  {Object} options ...
- * @param {String} [options.path='.'] the path to the z/x/y tile directory
+ * @param {String} [options.target='.'] the path to the z/x/y tile directory
  * @param {String} [options.ext='pbf'] the file extension to use on each tile
+ * @return {Promise} resolves true when done.
  */
 function saveBuff(buff, z, x, y, options) {
-  dir = join(options.path || '', z, x);
-  if (exists(dir)) {
-    save(buff, join(dir, `${y}.${ext}`));
-  } else {
-    mkdir(dir, (err, success)=>{
-      if (err) throw err;
-      save(buff, dir, y);
-    });
-  }
+  // let dir = join(options.target || '', `${z}`, `${x}`);
+  return ensureDir(options.target)
+    .then((dir)=>ensureDir(join(dir, `${z}`)))
+    .then((dir)=>ensureDir(join(dir, `${x}`)))
+    .then((dir)=>save(buff, join(dir, `${y}.${options.ext || 'pbf'}`)));
 }
 
 /**
@@ -160,31 +185,43 @@ function saveBuff(buff, z, x, y, options) {
  *   special properties:
  * @param  {String|undefined} [options.ext='pbf'] the file extension with which
  *   to save each tile
- * @param {String|undefined} [options.path='.'] where to store the z/x/y tile
+ * @param {String|undefined} [options.target='.'] where to store the z/x/y tile
  *   directory
  * @param  {Number} options.maxZoom the maximum zoom to save
  * @param  {Number} [z=0]  the z-coordinate of the tile
  * @param  {Number} [x=0]  the x-coordinate of the tile
  * @param  {Number} [y=0]  the x-coordinate of the tile
  */
-function recur(indexMapping, options, z=0, x=0, y=0) {
+async function recur(indexMapping, options, z=0, x=0, y=0) {
+  debug('this:recursion')(
+    `processing ${z}/${x}/${y} for ${Object.keys(indexMapping).join()}`
+  );
   const buff = getBuff(indexMapping, z, x, y);
   if (buff) {
-    saveBuff(buff, z, x, y, options);
+    await saveBuff(buff, z, x, y, options);
     if (z < (options.maxZoom || options.max_zoom || 24) && z < 24) {
-      getChildren(z, x, y).forEach(
-        (child) => {
-          recur(index, ...child);
-        }
-      );
+      await Promise.all(
+        getChildren([x, y, z]).map(
+          (child) => {
+            let [_x, _y, _z] = child;
+            recur(indexMapping, options, _z, _x, _y)
+              .catch((err) => debug('this:recur')(err));
+          }
+        )
+      ).catch((err) => debug('this:recur:all')(err));
       const tileId = toId(z, x, y);
       Object.values(indexMapping).forEach(
         (tileIndex) =>{
           if (tileIndex.tiles) delete tileIndex.tiles[tileId];
         }
       );
+    } else {
+      debug('this:recur')(`reached max zoom @ ${z}`);
     }
+  } else {
+    debug('this:recur')(`no pbf for layers ${Object.keys(indexMapping)} @ ${z}/${x}/${y}`);
   }
+  return true;
 }
 /**
  * Generates the id of a tile in a tileIndex. Copied from
@@ -192,7 +229,7 @@ function recur(indexMapping, options, z=0, x=0, y=0) {
  * @param  {Nubmer} z  the z-index of the tile
  * @param  {Number} x  the x-index of the tile
  * @param  {Number} y  the y-index of the tile
- * @return {[type]}   [description]
+ * @return {Number} the hashed z/x/y id in a geojson-vt tiles object
  */
 function toId(z, x, y) {
   return (((1 << z) * y + x) * 32) + z;
@@ -202,18 +239,41 @@ function toId(z, x, y) {
  * of /x/y/z/tile.mvt
  * @param  {LayerIndexMapping} layerIndexMapping {[layerName]: tileIndex}
  * @param  {Object} options @see ensureIndexes#options
+ * @return {Promise} when all recursion has completed.
  */
 function init(layerIndexMapping, options) {
   layerIndexMapping = ensureIndexes(layerIndexMapping, options);
   const initialZXY = {};
   Object.values(layerIndexMapping)
     .forEach(
-      ({tileCoords}) => initialZXY[tileCoords.join(' ')] = true
+      (index) => {
+        if (index.tileCoords) {
+          // tileCoords is an object of
+          index.tileCoords.forEach(({x, y, z}) => {
+            debug('this:init:tileCoords')(`${z} ${x} ${y}`);
+            initialZXY[`${z} ${x} ${y}`] = true;
+          });
+        } else if (index.points) {
+          let area = bbox({type: 'FeatureCollection', features: index.points});
+          let [_x, _y, _z] = bboxToTile(area);
+          initialZXY[[_z, _x, _y].join(' ')] = true;
+        } else {
+          console.warn('unexpected non-supercluster, non-geojson-vt index.');
+        }
+      }
     );
-  const inits = Object.values(initialZXY).map((str) => str.split(' '));
-  for (let init of inits) {
-    recurse(layerIndexMapping, ...init);
-  }
+  debug('this:initialzxy')(JSON.stringify(initialZXY));
+  const inits = Object.keys(initialZXY)
+    .map((str) => str.split(' ').map((numStr) => Number(numStr)));
+  return Promise.all(
+    inits.map(
+      (initialTile) => recur(layerIndexMapping, options, ...initialTile)
+        .catch((err) => debug('this:recursion:err')(initialTile))
+    )
+  ).catch((err) => {
+    debug('this:recursion')(err);
+    throw err;
+  });
 }
 // TODO: rename init to something descriptive
 // export everything important for testing

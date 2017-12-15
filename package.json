@@ -4,7 +4,9 @@
   "description": "An experiment in makeing a set of mbtiles from the output of geojson-vt",
   "main": "index.js",
   "scripts": {
-    "test": "mocha"
+    "test": "mocha -u tdd test/initial.test.js",
+    "posttest": "rm -r test/output/*",
+    "debug-test": "DEBUG=this:* mocha -u tdd test/initial.test.js"
   },
   "keywords": [
     "geojson",
@@ -24,9 +26,7 @@
     "vt-pbf": "^3.1.0"
   },
   "devDependencies": {
-    "@turf/helpers": "^5.1.5",
     "eslint": "^4.13.0",
-    "eslint-config-google": "^0.9.1",
-    "sinon": "^4.1.3"
+    "eslint-config-google": "^0.9.1"
   }
 }
