@@ -1,6 +1,6 @@
 {
   "name": "store-mbtiles",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An experiment in makeing a set of mbtiles from the output of geojson-vt",
   "main": "index.js",
   "repository": {
