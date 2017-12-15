@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "An experiment in makeing a set of mbtiles from the output of geojson-vt",
   "main": "index.js",
+  "repository":{
+    "type": "git",
+    "url": "https://github.com/SKalt/store-mvt.git"
+  },
   "scripts": {
     "test": "mocha -u tdd test/index.js",
     "posttest": "rm -r test/output/*",
@@ -20,7 +24,6 @@
   "license": "MIT",
   "dependencies": {
     "@mapbox/mbtiles": "^0.9.0",
-    "@mapbox/tile-cover": "^3.0.2",
     "@mapbox/tilebelt": "^1.0.1",
     "@turf/bbox": "^5.1.5",
     "@turf/random": "^5.1.0",
