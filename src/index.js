@@ -109,7 +109,8 @@ function getBuff(layerIndexMapping, z, x, y) {
 
 /**
  * Saves a @see MVT to a target destination.
- * @private @ignore
+ * @private
+ * @async
  * @param  {MVT} buff
  * @param  {String} target a string in the style of a slippy map tile (e.g
  * 'z/x/y.pbf')
@@ -128,7 +129,8 @@ function save(buff, target) {
 
 /**
  * Ensures a directory exists.
- * @private @ignore
+ * @private
+ * @async
  * @param  {String} dir a path to a directory
  * @return {Promise} resolves the directory path when the directory exists.
  */
@@ -153,6 +155,7 @@ const ensureDir = (dir) => {
 
 /**
  * saves a protobuf in slippy tile format
+ * @async
  * @param  {MVT} buff a protobuf-encoded .mvt tile
  * @param  {Nubmer} z  the z-index of the tile
  * @param  {Number} x  the x-index of the tile
@@ -172,6 +175,7 @@ function saveBuff(buff, z, x, y, options) {
 /**
  * Recursively saves the tiles in the indexMapping at and below the input z, x,
  *  y
+ * @async
  * @param  {LayerIndexMapping} indexMapping
  * @param  {Object} options @see ensureIndexes#options , with the following
  *   special properties:
@@ -234,11 +238,13 @@ function toId(z, x, y) {
 /**
  * Turns a mapping of layer names to layer tile indexes into a directory
  * of /x/y/z/tile.mvt
+ * @async
+ * @export
  * @param  {LayerIndexMapping} layerIndexMapping {[layerName]: tileIndex}
  * @param  {Object} options @see ensureIndexes#options
  * @return {Promise} when all recursion has completed.
  */
-function init(layerIndexMapping, options) {
+function storeMvt(layerIndexMapping, options) {
   layerIndexMapping = ensureIndexes(layerIndexMapping, options);
   const initialZXY = {};
   Object.values(layerIndexMapping)
@@ -272,7 +278,6 @@ function init(layerIndexMapping, options) {
     throw err;
   });
 }
-// TODO: rename init to something descriptive
 
 // export everything important for testing
-module.exports = {init, getTiles, getBuff, saveBuff, ensureIndexes, recur};
+module.exports = {storeMvt, getTiles, getBuff, saveBuff, ensureIndexes, recur};

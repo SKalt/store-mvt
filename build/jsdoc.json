@@ -1,0 +1,8 @@
+{
+  "files": ["src/index.js"],
+  "plugins": ["node_modules/jsdoc-babel"],
+  "babel": {
+    "presets": [ "env" ],
+    "plugins": [ "transform-async-to-generator" ]
+  }
+}
