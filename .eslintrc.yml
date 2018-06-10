@@ -1,20 +1,27 @@
 env:
-  # for more enviromnent presets, see
-  # https://eslint.org/docs/4.0.0/user-guide/configuring#specifying-environments
   browser: true
   commonjs: true
   es6: true
   node: true
-extends: google
+extends: 'google'
 parserOptions:
-  ecmaFeatures:
-    experimentalObjectRestSpread: true
-  ecmaVersion: 8
+  ecmaVersion: 9
   sourceType: module
 rules:
   indent:
     - error
     - 2
-  comma-dangle:
+  linebreak-style:
     - error
-    - never
+    - unix
+  quotes:
+    - error
+    - single
+  semi:
+    - error
+    - always
+  padding-line-between-statements:
+    - error
+    - blankLine: always
+      prev: block-like
+      next: block-like

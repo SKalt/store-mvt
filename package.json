@@ -1,5 +1,5 @@
 {
-  "name": "store-mbtiles",
+  "name": "store-mvt",
   "version": "1.0.1",
   "description": "An experiment in makeing a set of mbtiles from the output of geojson-vt",
   "main": "index.js",
