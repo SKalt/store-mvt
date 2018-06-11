@@ -5,6 +5,7 @@ const {existsSync: exists, mkdir, writeFile} = require('fs');
 const {join} = require('path');
 const bbox = require('@turf/bbox');
 const debug = require('debug');
+debug.enable('store-mvt:*');
 
 /**
  * A datastructure indexing geospatial objects that outputs tiles via a
@@ -81,7 +82,7 @@ function getTiles(layerIndexMapping, z, x, y) {
       ([layerName, index]) => {
         let tile = index.getTile(z, x, y);
         const isPopulated = tile && tile.features.length;
-        debug('getTiles:isPopulated')(`${isPopulated}:${z}${x}${y}`);
+        debug('store-mvt:getTiles:isPopulated')(`${isPopulated}:${z}${x}${y}`);
         return isPopulated ? {[layerName]: tile} : {};
       }
     )
@@ -103,7 +104,7 @@ function getBuff(layerIndexMapping, z, x, y) {
   if (Object.keys(tileObj).length) {
     return vtPbf.fromGeojsonVt(tileObj);
   } else {
-    debug('getBuff')(tileObj);
+    debug('store-mvt:getBuff')(tileObj);
   }
 }
 
@@ -121,10 +122,13 @@ function save(buff, target) {
     writeFile(
       target, buff, (err, success) =>{
         if (err) reject(err);
-        debug('this:save')(`${target} : success`);
+        debug('store-mvt:save')(`${target} : success`);
         resolve(true);
       });
-  }).catch((err) => debug('this:save')(err));
+  }).catch((err) => {
+    debug('store-mvt:save')(err);
+    throw err;
+  });
 }
 
 /**
@@ -141,16 +145,19 @@ const ensureDir = (dir) => {
     } else {
       mkdir(dir, (err)=>{
         if (err) {
-          debug('this:dir:err')(err);
+          debug('store-mvt:dir:err')(err);
           if (!err.message.match('EEXIST')) {
-            debug('this:dir:unknown')(err);
+            debug('store-mvt:dir:unknown')(err);
             reject(err);
           }
         }
         resolve(dir);
       });
     }
-  }).catch((err) => debug('this:ensureDir')(err));
+  }).catch((err) => {
+    debug('store-mvt:ensureDir')(err);
+    throw err;
+  });
 };
 
 /**
@@ -171,7 +178,7 @@ function saveBuff(buff, options, z, x, y ) {
     .then((dir)=>ensureDir(join(dir, `${x}`)))
     .then((dir)=>save(buff, join(dir, `${y}.${options.ext || 'pbf'}`)));
 }
-
+const noop = async () => null;
 /**
  * Recursively saves the tiles in the indexMapping at and below the input z, x,
  *  y
@@ -183,19 +190,18 @@ function saveBuff(buff, options, z, x, y ) {
  *   to save each tile
  * @param {String|undefined} [options.target='.'] where to store the z/x/y tile
  *   directory
- * @param {Function} [options.save=saveBuff] an optional callback to save each
- *   tile
- * @param  {Number} options.maxZoom the maximum zoom to save
+ * @param {Function} [options.save] an optional callback to save each tile
+ * @param {Function} [options.before] an optional callback before each recursion
+ * @param {Function} [options.after] an optional callback after each recursion
+ * @param  {Number} options.maxZoom the maximum zoom to save. alias: max_zoom.
  * @param  {Number} [z=0]  the z-coordinate of the tile
  * @param  {Number} [x=0]  the x-coordinate of the tile
  * @param  {Number} [y=0]  the x-coordinate of the tile
  * @return {Promise} when all the child tiles are saved.
  */
-async function recur(indexMapping, options, z=0, x=0, y=0) {
-  debug('this:recursion')(
-    `processing ${z}/${x}/${y} for ${Object.keys(indexMapping).join()}`
-  );
-  const save = options.save || saveBuff;
+async function recur(indexMapping, options={}, z=0, x=0, y=0) {
+  const {before = noop, save = noop, after = noop} = options;
+  await before(...arguments);
   const buff = getBuff(indexMapping, z, x, y);
   if (buff) {
     await save(buff, options, z, x, y);
@@ -204,25 +210,35 @@ async function recur(indexMapping, options, z=0, x=0, y=0) {
         getChildren([x, y, z]).map(
           (child) => {
             let [_x, _y, _z] = child;
-            recur(indexMapping, options, _z, _x, _y)
-              .catch((err) => debug('this:recur')(err));
+            return recur(indexMapping, options, _z, _x, _y)
+              .catch((err) => debug('store-mvt:recur')(err));
           }
         )
-      ).catch((err) => debug('this:recur:all')(err));
+      ).catch((err) => debug('store-mvt:recur:all')(err));
       const tileId = toId(z, x, y);
       Object.values(indexMapping).forEach(
         (tileIndex) =>{
           if (tileIndex.tiles) delete tileIndex.tiles[tileId];
+          if (tileIndex.tileCoords) {
+            // an array of {z, x, y} that can amount to a memory leak
+            // while the iteration below runs in O(#tiles), this depth-first
+            // recursion keeps #tiles <= z.
+            const index = tileIndex.tileCoords.findIndex(
+              (obj) => obj.z === z && obj.x === x && obj.y === y
+            );
+            tileIndex.tileCoords.splice(index, 1);
+          }
         }
       );
     } else {
-      debug('this:recur')(`reached max zoom @ ${z}`);
+      debug('store-mvt:recur')(`reached max zoom @ ${z}`);
     }
   } else {
-    debug('this:recur')(
+    debug('store-mvt:recur')(
       `no pbf for layers ${Object.keys(indexMapping)} @ ${z}/${x}/${y}`
     );
   }
+  await after(...arguments);
   return true;
 }
 
@@ -239,6 +255,23 @@ function toId(z, x, y) {
 }
 
 /**
+ * [getInits description]
+ * @param  {TileIndex} index
+ * @return {Object[]} {x, y, z} of tile(s) covering the entire index dataset.
+ */
+function getInits(index) {
+  if ('tileCoords' in index) return index.tileCoords;
+  if ('points' in index) {
+    let [x, y, z] = bboxToTile(bbox({
+      type: 'FeatureCollection',
+      features: index.points,
+    }));
+    return [{x, y, z}];
+  }
+  throw new TypeError('unexpected non-supercluster, non-geojson-vt index.');
+}
+
+/**
  * Turns a mapping of layer names to layer tile indexes into a directory
  * of /x/y/z/tile.mvt
  * @async
@@ -247,40 +280,35 @@ function toId(z, x, y) {
  * @param  {Object} options @see ensureIndexes#options
  * @return {Promise} when all recursion has completed.
  */
-function storeMvt(layerIndexMapping, options) {
+async function storeMvt(layerIndexMapping, options) {
   layerIndexMapping = ensureIndexes(layerIndexMapping, options);
-  const initialZXY = {};
-  Object.values(layerIndexMapping)
-    .forEach(
-      (index) => {
-        if (index.tileCoords) {
-          // tileCoords is an object of
-          index.tileCoords.forEach(({x, y, z}) => {
-            debug('this:init:tileCoords')(`${z} ${x} ${y}`);
-            initialZXY[`${z} ${x} ${y}`] = true;
-          });
-        } else if (index.points) {
-          let area = bbox({type: 'FeatureCollection', features: index.points});
-          let [_x, _y, _z] = bboxToTile(area);
-          initialZXY[[_z, _x, _y].join(' ')] = true;
-        } else {
-          console.warn('unexpected non-supercluster, non-geojson-vt index.');
-        }
-      }
-    );
-  debug('this:initialzxy')(JSON.stringify(initialZXY));
-  const inits = Object.keys(initialZXY)
-    .map((str) => str.split(' ').map((numStr) => Number(numStr)));
-  return Promise.all(
-    inits.map(
-      (initialTile) => recur(layerIndexMapping, options, ...initialTile)
-        .catch((err) => debug('this:recursion:err')(initialTile))
-    )
-  ).catch((err) => {
-    debug('this:recursion')(err);
+  const initialZXY = Object.values(layerIndexMapping)
+    .map(getInits)
+    .reduce((a, r) => [...a, ...r], []) // flatten
+    .reduce((s, {x, y, z}) => s.add(`${z} ${x} ${y}`), new Set());
+  debug('store-mvt:initialzxy')(JSON.stringify(initialZXY));
+  const inits = Array.from(initialZXY)
+    .map((str) => str.split(' ').map(Number))
+    .map((tile) => {
+      let recursion = recur(layerIndexMapping, options, ...tile)
+        .catch((err) => {
+          debug('store-mvt:recursion:err')(tile);
+          throw err;
+        });
+      return recursion;
+    });
+  const result = await Promise.all(inits).catch((err) => {
+    debug('store-mvt:recursion')(err);
     throw err;
   });
+  return result;
 }
-
 // export everything important for testing
-module.exports = {storeMvt, getTiles, getBuff, saveBuff, ensureIndexes, recur};
+module.exports = {
+  storeMvt,
+  getTiles,
+  getBuff,
+  saveBuff,
+  ensureIndexes,
+  recur,
+};

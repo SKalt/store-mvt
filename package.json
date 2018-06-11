@@ -12,9 +12,9 @@
     "md-doc": "node build/make-docs.js",
     "make-docs": "npm run md-doc && npm run html-doc",
     "prepublish": "npm run make-docs",
-    "test": "mocha -u tdd test/index.js",
+    "test": "mocha -u tdd test/index.js --timeout 60000",
     "posttest": "rm -r test/output/*",
-    "debug-test": "DEBUG=this:* mocha -u tdd test/index.js"
+    "debug-test": "DEBUG=this:* npm run test"
   },
   "keywords": [
     "geojson",

@@ -6,11 +6,16 @@ const {join} = require('path');
 const Pbf = require('pbf');
 const {VectorTile} = require('@mapbox/vector-tile');
 const {points, usa} = require('./fixtures/load-geojson.js');
-const turf = {...require('@turf/random'), ...require('@turf/helpers')};
+const turf = Object.assign(
+  {},
+  require('@turf/random'),
+  require('@turf/helpers'),
+);
 const main = require('../src/index.js');
 const {getTiles, getBuff, ensureIndexes} = main;
 const debug = require('debug');
 if (process.env.DEBUG) debug.enable(process.env.DEBUG);
+debug.enable('recursion:*');
 
 suite('Internals', ()=>{
   suite('getTiles', ()=>{
@@ -44,13 +49,16 @@ suite('Internals', ()=>{
         features.push(feat);
       }
       // there are a mix of clusters and empy points...
-      assert(features.some((f) => f.properties.cluster), 'no clusters encoded');
+      assert(
+        features.some((f) => f.properties.cluster),
+        'no clusters encoded'
+      );
     });
     test('Returns null if no features are present in a tile', ()=>{
       const empty = geojsonVt(turf.featureCollection([]));
       const layerTileMapping = {empty};
       const buff = getBuff(layerTileMapping, 1, 0, 0);
-      assert(!buff, 'getBuff returned a tile');
+      assert.equal(buff, null, 'getBuff returned a tile');
     });
   });
   suite('ensureIndexes', ()=>{
@@ -69,9 +77,25 @@ suite('Internals', ()=>{
 suite('Integration tests', ()=>{
   let _usa;
   let _points;
+  let running = {};
+  let runningCount = 0;
+  const defaultOptions = {
+    save: main.saveBuff,
+    before(_, opts, z, x, y) {
+      runningCount += 1;
+      running[`${z}/${x}/${y}}`] = runningCount;
+      // to give a sense of when the tile started
+    },
+    after(_, opts, z, x, y) {
+      runningCount -= 1;
+      delete running[`${z}/${x}/${y}}`];
+    },
+  };
   setup(function() {
+    runningCount = 0;
+    running = {};
     _usa = geojsonVt(usa, {
-      maxZoom: 4 // for timing
+      maxZoom: 4, // for timing
     });
     _points = supercluster();
     _points.load(points.features);
@@ -100,18 +124,45 @@ suite('Integration tests', ()=>{
       'a bad tile format was detected among ' + JSON.stringify(thirdLevel)
     );
   };
-  test('Saves geojson multipolygons', ()=>{
-    const target = join(__dirname, 'output', 'usa');
-    return main.storeMvt({_usa}, {target})
-      .then(()=>checkDirectory(target));
+
+  const checkCount = () => {
+    assert.equal(runningCount, 0, `${
+      JSON.stringify(running)
+    } -- ${runningCount} still running`);
+  };
+  test('Saves geojson multipolygons', (done)=>{
+    let options = {
+      ...defaultOptions,
+      target: join(__dirname, 'output', 'usa'),
+    };
+    main.storeMvt({_usa}, options)
+      .then(()=>checkDirectory(options.target))
+      .then(checkCount)
+      .then(done)
+      .catch(done);
   });
-  test('Saves supercluster', ()=>{
-    const target = join(__dirname, 'output', 'cluster');
-    return main.storeMvt({_points}, {target}).then(()=>checkDirectory(target));
+  test('Saves supercluster', (done)=>{
+    const options = {
+      ...defaultOptions,
+      target: join(__dirname, 'output', 'cluster'),
+    };
+
+    main.storeMvt({_points}, options)
+      .then(()=>checkDirectory(options.target))
+      .then(checkCount)
+      .then(done)
+      .catch(done);
   });
-  test('can save both', ()=>{
-    const target = join(__dirname, 'output', 'ensemble');
-    return main.storeMvt({_points, _usa}, {target})
-      .then(()=>checkDirectory(target));
+  test('can save both', (done)=>{
+    runningCount = 0; running = {};
+    const options = {
+      ...defaultOptions,
+      target: join(__dirname, 'output', 'ensemble'),
+    };
+    main.storeMvt({_points, _usa}, options)
+      .then(()=>checkDirectory(options.target))
+      .then(checkCount)
+      .then(done)
+      .catch(done);
   });
 });

@@ -25,3 +25,5 @@ rules:
     - blankLine: always
       prev: block-like
       next: block-like
+  prefer-rest-params: 0
+  no-console: 2
