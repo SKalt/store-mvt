@@ -1,3 +1,12 @@
 language: node_js
 node_js:
 - node
+deploy:
+  provider: npm
+  email: kalt.steven@gmail.com
+  api_key:
+    secure: RMJcKn0BP7d9NOAO648ScTXMciFEq6QsWzPHXS3aeI40C5CIV9ZOFDfdLyVu5Yvrey3xY/tLdNoPgH3BcQOQI8f2SIadX3S+jV+a10rnVFVrenYeVIgeGf8xSitXbr4G0XS8HGvtEsWww7Tb23NLWGceEgKkvKkWlPh3H3Bf6eBONEEdBuJONN3YseSAxxu2M+2QUefeJ3cAWvcJeH02OOhMNq78ifIj2mgPyBlVRz7bKuLjA9VU8QCAtlR1ceObNw/5pYEixy3hmkuXPCizlqgr4Uhyr4k7yXGqe8EWZLiT0/EiDX3NnVv9UU8D4B1EzzDMygkeHAMF5YcCYVBWnxiof9fRsMkmQm0088GKLbEvFKxH6jN7Dfojx7CUjf7S0iRNCCH2ur1I1nqwS3hJu0JfRRO2xCXP5J7Zn18uhbgmGT0rKJfpN0VPBmCQEjOl12Nuwd3UBnYkOQgowryU31nU6ORA93QXs82dzPBw6svpSR9yxxGP0EOTcbogKnXaEdFpyqV1MgPolTSDltuE/qHTxU6LjfpmO0znDaZLw05IFz9cWUzaJVnyqnp2HbiXxkEEK1TfBTKqTMSOq/aOqJ6x57zzaj7C/fs7gY44ygE58qz5Tx7VkNkOrUROBljEqBhzM/VtOuzIpXT2rpcMYavj/6l35+abYrBtQNwvbuk=
+  on:
+    branch: master
+    tags: true
+    repo: SKalt/store-mvt
